@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Anybody:ital,wght@0,100..905;1,100..905&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Space+Grotesk:wght@300..700&display=swap');
+
+:root {
+  --theme-primary: #00628f;
+  --theme-secondary: #ba0a0f;
+  --theme-tertiary: #725c00;
+  --theme-surface-bg: #f7f9ff;
+  --theme-on-surface: #0c1d2b;
+  --theme-outline-custom: #6f7881;
+}
+
+@theme {
+  --color-primary: var(--theme-primary);
+  --color-secondary: var(--theme-secondary);
+  --color-tertiary: var(--theme-tertiary);
+  --color-surface-bg: var(--theme-surface-bg);
+  --color-on-surface: var(--theme-on-surface);
+  --color-outline-custom: var(--theme-outline-custom);
+  
+  --font-heading: "Anybody", "Space Grotesk", sans-serif;
+  --font-sans: "Hanken Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-surface-bg);
+  color: var(--color-on-surface);
+}
+
+.headline-lg {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.data-font {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* Bento aesthetic tokens */
+.bento-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bento-card:hover {
+  border-color: #bec8d2;
+  box-shadow: 0 4px 18px rgba(12, 29, 43, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbdcef;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #00628f;
+}
+
+/* Custom high-fidelity media print overrides for clean PDF Exports */
+@media print {
+  /* Reset HTML and body to pure white, allowing natural height flow */
+  html, body {
+    background-color: white !important;
+    background: white !important;
+    color: black !important;
+    font-size: 11pt !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Reset the main app shell container */
+  #ndembo_kin_app_shell {
+    background: white !important;
+    background-color: white !important;
+    min-height: 0 !important;
+    height: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset the workspace container - remove the 18rem left padding for the sidebar! */
+  #ndembo_kin_app_shell > div {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+    background-color: white !important;
+  }
+
+  /* Reset the main workspace container and remove top/bottom paddings and scroll limits */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
+    background: white !important;
+    background-color: white !important;
+  }
+
+  /* Hide navigation sidebar, top headers, action buttons, custom tab bars, and modals */
+  aside,
+  header,
+  footer,
+  nav,
+  button,
+  .print\:hidden,
+  #finances_tab_navigation,
+  #export_controls,
+  #sidebar_navigation_rail {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+
+  /* Force modal overlay to be completely static and layout-friendly for print */
+  .fixed.inset-0 {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: auto !important;
+  }
+
+  .fixed.inset-0 > div {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    background: white !important;
+    background-color: white !important;
+  }
+
+  /* Premium page settings for standard document margins */
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 10mm 10mm;
+  }
+
+  /* Printable layouts container override using static flow for natural multi-page pagination */
+  #printable_facture_document,
+  #printable_devis_document,
+  #printable_contract_document,
+  #exportable_scouting_sheet,
+  #printable_finance_report {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: white !important;
+    background: white !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  /* Ensure all deep nested children remain fully visible during print */
+  #printable_facture_document *,
+  #printable_devis_document *,
+  #printable_contract_document *,
+  #exportable_scouting_sheet *,
+  #printable_finance_report * {
+    visibility: visible !important;
+  }
+
+  /* Retain colorful details for background-colors like badges and charts during printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Ndembo Kin Pro Management",
+  "description": "CRM/ERP complet pour agence de management sportif Ndembo Kin Connect",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
