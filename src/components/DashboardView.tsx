@@ -61,6 +61,44 @@ export default function DashboardView({
 
   const profit = totalRecettes - totalDepenses;
 
+  // Dynamic monthly sums for chart
+  const getMonthlySums = (monthStr: string) => {
+    let recettes = 0;
+    let depenses = 0;
+    transactions.forEach(t => {
+      if (t.date.startsWith(monthStr)) {
+        if (t.type === 'Recette') {
+          recettes += t.amount;
+        } else {
+          depenses += t.amount;
+        }
+      }
+    });
+    return { recettes, depenses };
+  };
+
+  const chartMai = getMonthlySums("2026-05");
+  const chartJuin = getMonthlySums("2026-06");
+  const chartJuillet = getMonthlySums("2026-07");
+
+  // Default max to 50K if values are small to preserve chart proportions, otherwise scale dynamically
+  const chartMaxVal = Math.max(50000, chartMai.recettes, chartMai.depenses, chartJuin.recettes, chartJuin.depenses, chartJuillet.recettes, chartJuillet.depenses);
+  
+  const getBarCoords = (val: number) => {
+    const height = (val / chartMaxVal) * 140; // Max height of 140px in standard SVG layout
+    return {
+      height: Math.round(height),
+      y: Math.round(200 - height)
+    };
+  };
+
+  const formatChartAmount = (val: number) => {
+    if (val >= 1000) {
+      return (val / 1000).toFixed(1).replace('.0', '') + 'K$';
+    }
+    return val + '$';
+  };
+
   const totalHTDevisEnAttente = devis
     .filter(d => d.status === 'En attente')
     .reduce((sum, d) => sum + d.totalHT, 0);
@@ -408,7 +446,15 @@ export default function DashboardView({
 
           {/* High Fidelity Interactive SVG Bar Chart representing the mock data finances */}
           <div className="relative pt-4 h-64">
-            <svg viewBox="0 0 600 240" className="w-full h-full text-xs font-mono">
+            <svg
+              viewBox="0 0 600 240"
+              className="w-full h-full text-xs font-mono"
+              role="img"
+              aria-label="Graphique des flux de trésorerie comparant les recettes et dépenses de Mai, Juin et Juillet"
+            >
+              <title>Rapport de Flux Financier Dynamique</title>
+              <desc>Graphique à barres montrant les recettes en bleu et les dépenses en rouge calculées depuis vos transactions réelles.</desc>
+              
               {/* Grid Lines */}
               <line x1="40" y1="20" x2="580" y2="20" stroke="#f1f3f6" strokeWidth="1" />
               <line x1="40" y1="70" x2="580" y2="70" stroke="#f1f3f6" strokeWidth="1" />
@@ -417,39 +463,38 @@ export default function DashboardView({
               <line x1="40" y1="200" x2="580" y2="200" stroke="#bec8d2" strokeWidth="1.5" />
 
               {/* Y Axis Indicators */}
-              <text x="35" y="24" className="fill-[#6f7881] text-right font-semibold" textAnchor="end">80K$</text>
-              <text x="35" y="74" className="fill-[#6f7881] text-right" textAnchor="end">50K$</text>
-              <text x="35" y="124" className="fill-[#6f7881] text-right" textAnchor="end">25K$</text>
-              <text x="35" y="174" className="fill-[#6f7881] text-right" textAnchor="end">5K$</text>
+              <text x="35" y="24" className="fill-[#6f7881] text-right font-semibold" textAnchor="end">{formatChartAmount(chartMaxVal)}</text>
+              <text x="35" y="74" className="fill-[#6f7881] text-right" textAnchor="end">{formatChartAmount(chartMaxVal * 0.71)}</text>
+              <text x="35" y="124" className="fill-[#6f7881] text-right" textAnchor="end">{formatChartAmount(chartMaxVal * 0.43)}</text>
+              <text x="35" y="174" className="fill-[#6f7881] text-right" textAnchor="end">{formatChartAmount(chartMaxVal * 0.14)}</text>
               <text x="35" y="204" className="fill-[#6f7881] text-right" textAnchor="end">0$</text>
 
               {/* Data Bars */}
-              {/* Column 1: Mai (FAC-001 Recette vs Salaries Depense) */}
-              {/* Recettes Mai: 40600 (height fraction) */}
+              {/* Column 1: Mai */}
               <g className="hover:opacity-85 transition-opacity cursor-pointer">
-                <rect x="120" y="80" width="35" height="120" fill="#00628f" rx="3" />
-                <rect x="160" y="160" width="35" height="40" fill="#ba0a0f" rx="3" />
+                <rect x="120" y={getBarCoords(chartMai.recettes).y} width="35" height={getBarCoords(chartMai.recettes).height} fill="#00628f" rx="3" />
+                <rect x="160" y={getBarCoords(chartMai.depenses).y} width="35" height={getBarCoords(chartMai.depenses).height} fill="#ba0a0f" rx="3" />
                 <text x="157" y="220" className="fill-on-surface font-semibold text-center" textAnchor="middle">Mai 2026</text>
-                <text x="137" y="72" className="fill-primary font-bold" textAnchor="middle">40.6K$</text>
-                <text x="177" y="152" className="fill-[#ba0a0f]" textAnchor="middle">5K$</text>
+                <text x="137" y={Math.max(15, getBarCoords(chartMai.recettes).y - 8)} className="fill-primary font-bold" textAnchor="middle">{formatChartAmount(chartMai.recettes)}</text>
+                <text x="177" y={Math.max(15, getBarCoords(chartMai.depenses).y - 8)} className="fill-[#ba0a0f]" textAnchor="middle">{formatChartAmount(chartMai.depenses)}</text>
               </g>
 
-              {/* Column 2: Juin (Recettes sponsor 25K$ / Depenses logistique & promo 4K$) */}
+              {/* Column 2: Juin */}
               <g className="hover:opacity-85 transition-opacity cursor-pointer">
-                <rect x="320" y="115" width="35" height="85" fill="#00628f" rx="3" />
-                <rect x="360" y="170" width="35" height="30" fill="#ba0a0f" rx="3" />
+                <rect x="320" y={getBarCoords(chartJuin.recettes).y} width="35" height={getBarCoords(chartJuin.recettes).height} fill="#00628f" rx="3" />
+                <rect x="360" y={getBarCoords(chartJuin.depenses).y} width="35" height={getBarCoords(chartJuin.depenses).height} fill="#ba0a0f" rx="3" />
                 <text x="357" y="220" className="fill-on-surface font-semibold text-center" textAnchor="middle">Juin 2026</text>
-                <text x="337" y="107" className="fill-primary font-bold" textAnchor="middle">25K$</text>
-                <text x="377" y="162" className="fill-[#ba0a0f]" textAnchor="middle">4K$</text>
+                <text x="337" y={Math.max(15, getBarCoords(chartJuin.recettes).y - 8)} className="fill-primary font-bold" textAnchor="middle">{formatChartAmount(chartJuin.recettes)}</text>
+                <text x="377" y={Math.max(15, getBarCoords(chartJuin.depenses).y - 8)} className="fill-[#ba0a0f]" textAnchor="middle">{formatChartAmount(chartJuin.depenses)}</text>
               </g>
 
-              {/* Column 3: Juillet (Forecast - Sponsoring Vodac Recette 43.5K$ / Depenses forecast 15K$) */}
+              {/* Column 3: Juillet */}
               <g className="hover:opacity-85 transition-opacity cursor-pointer">
-                <rect x="490" y="75" width="35" height="125" fill="#00628f" fillOpacity="0.4" stroke="#00628f" strokeDasharray="3,3" rx="3" />
-                <rect x="530" y="140" width="35" height="60" fill="#ba0a0f" fillOpacity="0.4" stroke="#ba0a0f" strokeDasharray="3,3" rx="3" />
+                <rect x="490" y={getBarCoords(chartJuillet.recettes).y} width="35" height={getBarCoords(chartJuillet.recettes).height} fill="#00628f" fillOpacity="0.4" stroke="#00628f" strokeDasharray="3,3" rx="3" />
+                <rect x="530" y={getBarCoords(chartJuillet.depenses).y} width="35" height={getBarCoords(chartJuillet.depenses).height} fill="#ba0a0f" fillOpacity="0.4" stroke="#ba0a0f" strokeDasharray="3,3" rx="3" />
                 <text x="527" y="220" className="fill-[#3f4850] font-sans italic text-center" textAnchor="middle">Juillet (Prev)</text>
-                <text x="507" y="67" className="fill-primary font-bold font-mono opacity-70" textAnchor="middle">43.5K$</text>
-                <text x="547" y="132" className="fill-[#ba0a0f] opacity-70" textAnchor="middle">15K$</text>
+                <text x="507" y={Math.max(15, getBarCoords(chartJuillet.recettes).y - 8)} className="fill-primary font-bold font-mono opacity-70" textAnchor="middle">{formatChartAmount(chartJuillet.recettes)}</text>
+                <text x="547" y={Math.max(15, getBarCoords(chartJuillet.depenses).y - 8)} className="fill-[#ba0a0f] opacity-70" textAnchor="middle">{formatChartAmount(chartJuillet.depenses)}</text>
               </g>
             </svg>
           </div>

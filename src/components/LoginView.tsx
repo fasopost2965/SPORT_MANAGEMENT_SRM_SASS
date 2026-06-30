@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Shield, Sparkles, Trophy, Mail, Lock, KeyRound, ArrowLeft, CheckCircle2, HelpCircle, Send } from 'lucide-react';
 import NdemboKinLogo from './NdemboKinLogo';
+import { hashPassword, isHashed } from '../utils/security';
 
 interface LoginViewProps {
   onLogin: (user: { name: string; role: string; email: string; avatarUrl?: string; password?: string }) => void;
@@ -23,7 +24,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
   const [forgotSuccess, setForgotSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setError('Veuillez entrer une adresse email valide.');
@@ -45,16 +46,18 @@ export default function LoginView({ onLogin }: LoginViewProps) {
     // Default backup users if list is empty
     const defaultUsers = [
       {
+        id: 'usr_1',
         name: 'Yannick Ndémbo',
         email: 'admin@ndembokin.com',
         role: 'Directeur Associé',
-        password: 'admin1234'
+        password: '6f71fd1e6047cf8f4c398bc734268e31002347fa6b5fa7cf6f6bc4db392b453e' // 'admin1234' SHA-256
       },
       {
+        id: 'usr_2',
         name: 'Yannick Ndémbo',
         email: 'bouakebb902@gmail.com',
         role: 'Directeur Associé',
-        password: 'admin1234'
+        password: '6f71fd1e6047cf8f4c398bc734268e31002347fa6b5fa7cf6f6bc4db392b453e' // 'admin1234' SHA-256
       }
     ];
 
@@ -79,11 +82,35 @@ export default function LoginView({ onLogin }: LoginViewProps) {
       allUsers.push(savedUser);
     }
 
-    // Try matching
-    const matchedUser = allUsers.find(u => 
-      u.email.toLowerCase().trim() === lowerEmail && 
-      (u.password === cleanPassword || (!u.password && cleanPassword === 'admin1234'))
-    );
+    // Try matching using SHA-256 hashing
+    const typedHash = await hashPassword(cleanPassword);
+    let matchedUser: any = null;
+
+    for (const u of allUsers) {
+      if (u.email.toLowerCase().trim() !== lowerEmail) continue;
+      const storedPass = u.password || '6f71fd1e6047cf8f4c398bc734268e31002347fa6b5fa7cf6f6bc4db392b453e'; // Default to admin1234 hash
+      
+      if (isHashed(storedPass)) {
+        if (storedPass === typedHash) {
+          matchedUser = u;
+          break;
+        }
+      } else {
+        // Plaintext compatibility: hash and upgrade if matches
+        if (storedPass === cleanPassword) {
+          matchedUser = { ...u, password: typedHash };
+          // Persist the hashed version
+          const updatedUsers = allUsers.map(usr => {
+            if (usr.email.toLowerCase().trim() === lowerEmail) {
+              return { ...usr, password: typedHash };
+            }
+            return usr;
+          });
+          localStorage.setItem('ndembo_users_list', JSON.stringify(updatedUsers));
+          break;
+        }
+      }
+    }
 
     if (matchedUser) {
       setError('');
@@ -92,7 +119,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
         role: matchedUser.role || 'Directeur Associé',
         email: lowerEmail,
         avatarUrl: matchedUser.avatarUrl,
-        password: matchedUser.password || 'admin1234'
+        password: matchedUser.password // we don't store it anyway in currentUser localStorage but keep it in in-memory session if needed
       });
     } else {
       setError('Identifiants incorrects. Veuillez vous connecter avec vos identifiants à jour ou par défaut ("admin@ndembokin.com" et "admin1234").');

@@ -31,6 +31,7 @@ interface FacturesViewProps {
   onConvertToProject: (facture: Facture) => void;
   tvaDefault: number;
   settings?: BusinessSettings;
+  autoOpenCreate?: boolean;
 }
 
 export default function FacturesView({
@@ -40,14 +41,21 @@ export default function FacturesView({
   onMarkAsPaid,
   onConvertToProject,
   tvaDefault,
-  settings
+  settings,
+  autoOpenCreate
 }: FacturesViewProps) {
   // Filters
   const [filterStatus, setFilterStatus] = useState<FactureStatus | 'Tous'>('Tous');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Create modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(!!autoOpenCreate);
+
+  React.useEffect(() => {
+    if (autoOpenCreate) {
+      setShowCreateModal(true);
+    }
+  }, [autoOpenCreate]);
   const [clientId, setClientId] = useState('');
   const [dateDue, setDateDue] = useState('');
   const [notes, setNotes] = useState('Paiement par virement Rawbank requis à échéance. Titulaire Ndembo Kin Connect.');

@@ -16,9 +16,10 @@ interface ContactsViewProps {
   projects: Project[];
   onAddContact: (contact: Contact) => void;
   onUpdateContact: (contact: Contact) => void;
+  autoOpenCreate?: boolean;
 }
 
-export default function ContactsView({ contacts, projects, onAddContact, onUpdateContact }: ContactsViewProps) {
+export default function ContactsView({ contacts, projects, onAddContact, onUpdateContact, autoOpenCreate }: ContactsViewProps) {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('fr-CD', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
   };
@@ -27,7 +28,13 @@ export default function ContactsView({ contacts, projects, onAddContact, onUpdat
   const [searchTerm, setSearchTerm] = useState('');
 
   // Creation modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(!!autoOpenCreate);
+
+  React.useEffect(() => {
+    if (autoOpenCreate) {
+      setShowCreateModal(true);
+    }
+  }, [autoOpenCreate]);
   const [name, setName] = useState('');
   const [type, setType] = useState<ContactType>('Athlète');
   const [email, setEmail] = useState('');

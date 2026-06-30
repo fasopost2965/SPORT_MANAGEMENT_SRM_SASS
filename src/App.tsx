@@ -21,6 +21,7 @@ import PerformancesView from './components/PerformancesView';
 import ParametresView from './components/ParametresView';
 import CardsView from './components/CardsView';
 import RhView from './components/RhView';
+import AiAssistant from './components/AiAssistant';
 
 // Types & Seed Data
 import {
@@ -37,7 +38,8 @@ import {
   ProjectStatus,
   TaskStatus,
   NfcCard,
-  RolePrivilege
+  RolePrivilege,
+  ContractStatus
 } from './types';
 
 import {
@@ -63,7 +65,9 @@ export default function App() {
   // Save session on state change
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('ndembo_current_user', JSON.stringify(currentUser));
+      // Exclude password field to avoid storing it in plaintext in localStorage
+      const { password, ...safeUser } = currentUser;
+      localStorage.setItem('ndembo_current_user', JSON.stringify(safeUser));
     } else {
       localStorage.removeItem('ndembo_current_user');
     }
@@ -77,6 +81,7 @@ export default function App() {
   const [currentView, setView] = useState<ViewType>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [autoOpenCreateAction, setAutoOpenCreateAction] = useState<string | null>(null);
 
   // 3. Central tables databases
   const [settings, setSettings] = useState<BusinessSettings>(() => {
@@ -214,43 +219,50 @@ export default function App() {
 
   // 4. Synchronization effect: Recalculate automatic project progress based on average task completion
   useEffect(() => {
-    const updatedProjects = projects.map(project => {
-      // Find tasks belonging to this project
-      const projectTasks = tasks.filter(t => t.projectId === project.id);
-      if (projectTasks.length === 0) return project;
+    setProjects(prevProjects => {
+      const updatedProjects = prevProjects.map(project => {
+        // Find tasks belonging to this project
+        const projectTasks = tasks.filter(t => t.projectId === project.id);
+        if (projectTasks.length === 0) return project;
 
-      // Calculate aggregate average progress
-      const totalProgress = projectTasks.reduce((sum, t) => sum + t.progress, 0);
-      const computedProgress = Math.round(totalProgress / projectTasks.length);
+        // Calculate aggregate average progress
+        const totalProgress = projectTasks.reduce((sum, t) => sum + t.progress, 0);
+        const computedProgress = Math.round(totalProgress / projectTasks.length);
 
-      // Determine updated status as Terminé if all tasks are Terminé (100%)
-      let computedStatus: ProjectStatus = project.status;
-      if (computedProgress === 100) {
-        computedStatus = 'Terminé';
-      } else if (computedProgress > 0 && project.status === 'Planifié') {
-        computedStatus = 'En cours';
+        // Determine updated status as Terminé if all tasks are Terminé (100%)
+        let computedStatus: ProjectStatus = project.status;
+        if (computedProgress === 100) {
+          computedStatus = 'Terminé';
+        } else if (computedProgress > 0 && project.status === 'Planifié') {
+          computedStatus = 'En cours';
+        }
+
+        if (project.progress === computedProgress && project.status === computedStatus) {
+          return project;
+        }
+
+        return {
+          ...project,
+          progress: computedProgress,
+          status: computedStatus
+        };
+      });
+
+      // To prevent infinite react render loop, only update state if indeed progress calculation values changed
+      let hasChanged = false;
+      for (let i = 0; i < prevProjects.length; i++) {
+        if (
+          prevProjects[i].progress !== updatedProjects[i]?.progress || 
+          prevProjects[i].status !== updatedProjects[i]?.status
+        ) {
+          hasChanged = true;
+          break;
+        }
       }
 
-      return {
-        ...project,
-        progress: computedProgress,
-        status: computedStatus
-      };
+      return hasChanged ? updatedProjects : prevProjects;
     });
-
-    // To prevent infinite react render loop, only update state if indeed progress calculation values changed
-    let hasChanged = false;
-    for (let i = 0; i < projects.length; i++) {
-      if (projects[i].progress !== updatedProjects[i]?.progress || projects[i].status !== updatedProjects[i]?.status) {
-        hasChanged = true;
-        break;
-      }
-    }
-
-    if (hasChanged) {
-      setProjects(updatedProjects);
-    }
-  }, [tasks, projects]);
+  }, [tasks]);
 
   // Handle manual login simulation
   const handleLogin = (user: { name: string; role: string; email: string }) => {
@@ -462,44 +474,23 @@ export default function App() {
     setView('contrats');
   };
 
-  const handleUpdateContractStatus = (id: string, status: any) => {
+  const handleUpdateContractStatus = (id: string, status: ContractStatus) => {
     setContracts(contracts.map(c => (c.id === id ? { ...c, status } : c)));
   };
 
   // Fast shortcut buttons triggers
   const handleSidebarQuickAction = (action: string) => {
+    setAutoOpenCreateAction(action);
     if (action === 'new_contract') {
       setView('contrats');
-      // Pass flag down or trigger simple timeout simulate create clicks
-      setTimeout(() => {
-        // Quick visual toggle clicks
-        const btn = document.querySelector('button[title="Nouveau Contrat"]') as HTMLButtonElement;
-        if (btn) btn.click();
-      }, 100);
     } else if (action === 'new_contact') {
       setView('contacts');
-      setTimeout(() => {
-        const btn = document.querySelector('button[title="Ajouter un contact"]') as HTMLButtonElement;
-        if (btn) btn.click();
-      }, 100);
     } else if (action === 'new_devis') {
       setView('devis');
-      setTimeout(() => {
-        const btn = document.querySelector('button[title="Nouveau Devis"]') as HTMLButtonElement;
-        if (btn) btn.click();
-      }, 100);
     } else if (action === 'new_invoice') {
       setView('factures');
-      setTimeout(() => {
-        const btn = document.querySelector('button[title="Créer Facture"]') as HTMLButtonElement;
-        if (btn) btn.click();
-      }, 100);
     } else if (action === 'new_project') {
       setView('projets');
-      setTimeout(() => {
-        const btn = document.querySelector('button[title="Ajouter un projet"]') as HTMLButtonElement;
-        if (btn) btn.click();
-      }, 100);
     }
   };
 
@@ -559,9 +550,52 @@ export default function App() {
 
   // Render Active view components
   const renderActiveView = () => {
-    // Dynamic query elements pre-checks
-    const matchedContacts = contacts;
-    const matchedProjects = projects;
+    // Dynamic query elements pre-checks with searchQuery filtering
+    const query = searchQuery.toLowerCase().trim();
+
+    const matchedContacts = !query ? contacts : contacts.filter(c => 
+      c.name.toLowerCase().includes(query) ||
+      c.email.toLowerCase().includes(query) ||
+      c.phone.toLowerCase().includes(query) ||
+      (c.notes && c.notes.toLowerCase().includes(query)) ||
+      (c.sport && c.sport.toLowerCase().includes(query))
+    );
+
+    const matchedProjects = !query ? projects : projects.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.clientName.toLowerCase().includes(query) ||
+      (p.description && p.description.toLowerCase().includes(query))
+    );
+
+    const matchedTasks = !query ? tasks : tasks.filter(t => 
+      t.title.toLowerCase().includes(query) ||
+      (t.description && t.description.toLowerCase().includes(query))
+    );
+
+    const matchedDevis = !query ? devisList : devisList.filter(d => 
+      d.number.toLowerCase().includes(query) ||
+      d.clientName.toLowerCase().includes(query) ||
+      (d.notes && d.notes.toLowerCase().includes(query))
+    );
+
+    const matchedFactures = !query ? factures : factures.filter(f => 
+      f.number.toLowerCase().includes(query) ||
+      f.clientName.toLowerCase().includes(query) ||
+      (f.notes && f.notes.toLowerCase().includes(query))
+    );
+
+    const matchedTransactions = !query ? transactions : transactions.filter(t => 
+      t.description.toLowerCase().includes(query) ||
+      (t.projectName && t.projectName.toLowerCase().includes(query)) ||
+      (t.clientName && t.clientName.toLowerCase().includes(query)) ||
+      t.category.toLowerCase().includes(query)
+    );
+
+    const matchedContracts = !query ? contracts : contracts.filter(c => 
+      c.clientName.toLowerCase().includes(query) ||
+      c.type.toLowerCase().includes(query) ||
+      (c.notes && c.notes.toLowerCase().includes(query))
+    );
     
     // Check view privileges
     const activePrivilege = rolePrivileges.find(p => p.role === currentUser.role);
@@ -598,13 +632,13 @@ export default function App() {
       case 'dashboard':
         return (
           <DashboardView
-            contacts={contacts}
-            projects={projects}
-            tasks={tasks}
-            devis={devisList}
-            factures={factures}
-            transactions={transactions}
-            contracts={contracts}
+            contacts={matchedContacts}
+            projects={matchedProjects}
+            tasks={matchedTasks}
+            devis={matchedDevis}
+            factures={matchedFactures}
+            transactions={matchedTransactions}
+            contracts={matchedContracts}
             cards={cards}
             setView={setView}
             onQuickAction={handleSidebarQuickAction}
@@ -613,46 +647,49 @@ export default function App() {
       case 'devis':
         return (
           <DevisView
-            devisList={devisList}
-            contacts={contacts}
+            devisList={matchedDevis}
+            contacts={matchedContacts}
             onAddDevis={handleAddDevis}
             onUpdateStatus={handleUpdateDevisStatus}
             onConvertToFacture={handleConvertToFacture}
             onConvertToProject={handleConvertToProject}
             tvaDefault={settings.tvaDefault}
             settings={settings}
+            autoOpenCreate={autoOpenCreateAction === 'new_devis'}
           />
         );
       case 'factures':
         return (
           <FacturesView
-            factures={factures}
-            contacts={contacts}
+            factures={matchedFactures}
+            contacts={matchedContacts}
             onAddFacture={handleAddFacture}
             onMarkAsPaid={handleMarkAsPaid}
             onConvertToProject={handleFactureToProject}
             tvaDefault={settings.tvaDefault}
             settings={settings}
+            autoOpenCreate={autoOpenCreateAction === 'new_invoice'}
           />
         );
       case 'projets':
         return (
           <ProjetsView
-            projects={projects}
-            tasks={tasks}
-            contacts={contacts}
+            projects={matchedProjects}
+            tasks={matchedTasks}
+            contacts={matchedContacts}
             onAddProject={handleAddProject}
             onUpdateProjectStatus={handleUpdateProjectStatus}
             onAddTaskToProject={handleAddTask}
             onUpdateTaskStatus={handleUpdateTaskStatus}
             onUpdateTaskProgress={handleUpdateTaskProgress}
             onRemoveTask={handleRemoveTask}
+            autoOpenCreate={autoOpenCreateAction === 'new_project'}
           />
         );
       case 'taches':
         return (
           <TachesView
-            tasks={tasks}
+            tasks={matchedTasks}
             onAddTask={handleAddTask}
             onUpdateTaskStatus={handleUpdateTaskStatus}
             onRemoveTask={handleRemoveTask}
@@ -662,8 +699,8 @@ export default function App() {
       case 'finances-reports':
         return (
           <FinancesView
-            transactions={transactions}
-            projects={projects}
+            transactions={matchedTransactions}
+            projects={matchedProjects}
             onAddTransaction={handleAddTransaction}
             onDeleteTransaction={handleDeleteTransaction}
             canDeleteTransactions={activePrivilege ? activePrivilege.canDeleteTransactions : true}
@@ -673,26 +710,28 @@ export default function App() {
       case 'contrats':
         return (
           <ContratsView
-            contracts={contracts}
-            contacts={contacts}
-            projects={projects}
+            contracts={matchedContracts}
+            contacts={matchedContacts}
+            projects={matchedProjects}
             onAddContract={handleAddContract}
             onUpdateContractStatus={handleUpdateContractStatus}
+            autoOpenCreate={autoOpenCreateAction === 'new_contract'}
           />
         );
       case 'contacts':
         return (
           <ContactsView
-            contacts={contacts}
-            projects={projects}
+            contacts={matchedContacts}
+            projects={matchedProjects}
             onAddContact={handleAddContact}
             onUpdateContact={handleUpdateContact}
+            autoOpenCreate={autoOpenCreateAction === 'new_contact'}
           />
         );
       case 'performances':
         return (
           <PerformancesView
-            contacts={contacts}
+            contacts={matchedContacts}
             onUpdateContact={handleUpdateContact}
             canEditScoutingMetrics={activePrivilege ? activePrivilege.canEditScoutingMetrics : true}
           />
@@ -700,7 +739,7 @@ export default function App() {
       case 'cartes':
         return (
           <CardsView
-            contacts={contacts}
+            contacts={matchedContacts}
             cards={cards}
             onIssueCard={handleIssueCard}
             onAddContact={handleAddContact}
@@ -786,6 +825,9 @@ export default function App() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onToggleSidebar={() => setIsSidebarOpen(true)}
+          factures={factures}
+          tasks={tasks}
+          contracts={contracts}
         />
 
         {/* Content body space */}
@@ -804,6 +846,7 @@ export default function App() {
           </AnimatePresence>
         </main>
       </div>
+      <AiAssistant />
     </div>
   );
 }

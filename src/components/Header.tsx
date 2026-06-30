@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Bell, HelpCircle, Search, ChevronRight, CheckCircle2, AlertTriangle, MessageSquare, Menu } from 'lucide-react';
 import { ViewType } from './Sidebar';
+import { Facture, Task, Contract } from '../types';
 
 interface HeaderProps {
   currentView: ViewType;
@@ -13,38 +14,83 @@ interface HeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   onToggleSidebar?: () => void;
+  factures?: Facture[];
+  tasks?: Task[];
+  contracts?: Contract[];
 }
 
-export default function Header({ currentView, user, searchQuery, setSearchQuery, onToggleSidebar }: HeaderProps) {
+export default function Header({ currentView, user, searchQuery, setSearchQuery, onToggleSidebar, factures, tasks, contracts }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Notification lists
-  const alerts = [
-    {
-      id: 'al_1',
-      type: 'warning',
-      text: "Facture FAC-2026-002 de Vodac Business est en attente (43.5K €)",
-      time: "Il y a 2 heures",
-      icon: AlertTriangle,
-      color: "text-secondary bg-[#ffdad6]"
-    },
-    {
-      id: 'al_2',
+  // Generate dynamic alert notifications based on real data
+  const dynamicAlerts: Array<{
+    id: string;
+    type: string;
+    text: string;
+    time: string;
+    icon: any;
+    color: string;
+  }> = [];
+
+  // 1. Unpaid/overdue invoices
+  if (factures && factures.length > 0) {
+    const unpaid = factures.filter(f => f.status === 'Non payée' || f.status === 'Échue');
+    unpaid.slice(0, 2).forEach(f => {
+      dynamicAlerts.push({
+        id: `fact_${f.id}`,
+        type: 'warning',
+        text: `Facture ${f.number} de ${f.clientName} est en attente (${f.totalTTC} $)`,
+        time: "Échéance: " + f.dateDue,
+        icon: AlertTriangle,
+        color: "text-secondary bg-[#ffdad6]"
+      });
+    });
+  }
+
+  // 2. Unsigned contracts
+  if (contracts && contracts.length > 0) {
+    const unsigned = contracts.filter(c => !c.signatures?.signed);
+    unsigned.slice(0, 2).forEach(c => {
+      dynamicAlerts.push({
+        id: `contract_${c.id}`,
+        type: 'info',
+        text: `Contrat de ${c.clientName} en attente de signature (${c.amount} $)`,
+        time: "Créé le: " + c.dateCreated,
+        icon: CheckCircle2,
+        color: "text-primary bg-[#e3efff]"
+      });
+    });
+  }
+
+  // 3. Pending/active tasks
+  if (tasks && tasks.length > 0) {
+    const activeTasks = tasks.filter(t => t.status !== 'Terminé');
+    activeTasks.slice(0, 2).forEach(t => {
+      dynamicAlerts.push({
+        id: `task_${t.id}`,
+        type: 'warning',
+        text: `La tâche '${t.title}' est en cours de traitement`,
+        time: "Fin prévue: " + t.endDate,
+        icon: AlertTriangle,
+        color: "text-tertiary bg-[#ffe07f]"
+      });
+    });
+  }
+
+  // Fallback if no notifications
+  if (dynamicAlerts.length === 0) {
+    dynamicAlerts.push({
+      id: 'default_info',
       type: 'info',
-      text: "Le contrat de Jean-Pierre Kalala a été signé et homologué",
-      time: "Hier",
+      text: "Toutes vos factures, tâches et contrats sont à jour.",
+      time: "Aujourd'hui",
       icon: CheckCircle2,
-      color: "text-primary bg-[#e3efff]"
-    },
-    {
-      id: 'al_3',
-      type: 'warning',
-      text: "La tâche 'Obtention du visa Schengen' arrive à échéance bientôt !",
-      time: "Il y a 3 jours",
-      icon: AlertTriangle,
-      color: "text-tertiary bg-[#ffe07f]"
-    }
-  ];
+      color: "text-emerald-600 bg-emerald-50"
+    });
+  }
+
+  const alerts = dynamicAlerts;
+  const hasActiveAlerts = alerts.length > 0 && alerts[0].id !== 'default_info';
 
   const getViewLabel = (view: ViewType) => {
     switch (view) {
@@ -116,7 +162,9 @@ export default function Header({ currentView, user, searchQuery, setSearchQuery,
             title="Notifications agence"
           >
             <Bell className="w-5 h-5 text-[#3f4850] hover:text-primary" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-[#ba0a0f] rounded-full ring-2 ring-white" />
+            {hasActiveAlerts && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-[#ba0a0f] rounded-full ring-2 ring-white" />
+            )}
           </button>
 
           {/* Help/Instruction button */}
@@ -139,9 +187,11 @@ export default function Header({ currentView, user, searchQuery, setSearchQuery,
                   <span className="font-heading font-extrabold text-sm text-on-surface">
                     Alertes &amp; Notifications d'Agence
                   </span>
-                  <span className="bg-[#ba0a0f] text-white text-[10px] font-mono px-1.5 py-0.5 rounded font-bold">
-                    3 Actives
-                  </span>
+                  {hasActiveAlerts && (
+                    <span className="bg-[#ba0a0f] text-white text-[10px] font-mono px-1.5 py-0.5 rounded font-bold">
+                      {alerts.length} Active{alerts.length > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
                   {alerts.map((al) => {

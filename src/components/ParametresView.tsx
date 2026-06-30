@@ -30,9 +30,12 @@ import {
   Edit,
   X,
   UserPlus,
-  Palette
+  Palette,
+  Download,
+  Upload
 } from 'lucide-react';
 import { BusinessSettings, RolePrivilege, SystemUser } from '../types';
+import { hashPassword, isHashed } from '../utils/security';
 
 interface ParametresViewProps {
   settings: BusinessSettings;
@@ -80,14 +83,14 @@ export default function ParametresView({
         name: 'Yannick Ndémbo',
         email: 'admin@ndembokin.com',
         role: 'Directeur Associé',
-        password: 'admin1234'
+        password: '6f71fd1e6047cf8f4c398bc734268e31002347fa6b5fa7cf6f6bc4db392b453e' // 'admin1234' SHA-256
       },
       {
         id: 'usr_2',
         name: 'Yannick Ndémbo',
         email: 'bouakebb902@gmail.com',
         role: 'Directeur Associé',
-        password: 'admin1234'
+        password: '6f71fd1e6047cf8f4c398bc734268e31002347fa6b5fa7cf6f6bc4db392b453e' // 'admin1234' SHA-256
       }
     ];
   });
@@ -270,7 +273,7 @@ export default function ParametresView({
   };
 
   // Profile customization submission
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
 
@@ -286,12 +289,14 @@ export default function ParametresView({
       }
     }
 
+    const hashedPassword = newPassword ? await hashPassword(newPassword) : undefined;
+
     const updatedUser = {
       ...currentUser,
       name: profileName,
       email: profileEmail,
       avatarUrl: profileAvatar,
-      ...(newPassword ? { password: newPassword } : {})
+      ...(hashedPassword ? { password: hashedPassword } : {})
     };
 
     onUpdateCurrentUser(updatedUser);
@@ -304,7 +309,7 @@ export default function ParametresView({
           name: profileName,
           email: profileEmail,
           avatarUrl: profileAvatar,
-          ...(newPassword ? { password: newPassword } : {})
+          ...(hashedPassword ? { password: hashedPassword } : {})
         };
       }
       return u;
@@ -330,6 +335,84 @@ export default function ParametresView({
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // Export full local database to JSON file
+  const handleExportData = () => {
+    try {
+      const backup: Record<string, string> = {};
+      const keys = [
+        'ndembo_settings',
+        'ndembo_contacts',
+        'ndembo_projects',
+        'ndembo_tasks',
+        'ndembo_devis',
+        'ndembo_factures',
+        'ndembo_transactions',
+        'ndembo_contracts',
+        'ndembo_cards',
+        'ndembo_role_privileges',
+        'ndembo_users_list'
+      ];
+      keys.forEach(k => {
+        const value = localStorage.getItem(k);
+        if (value) {
+          backup[k] = value;
+        }
+      });
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ndembo_kin_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Erreur lors de l'exportation des données : " + err);
+    }
+  };
+
+  // Import full local database from JSON file
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        
+        // Basic validation
+        if (typeof parsed !== 'object' || parsed === null) {
+          alert("Fichier de sauvegarde invalide.");
+          return;
+        }
+
+        const keys = Object.keys(parsed);
+        const hasNdemboKey = keys.some(k => k.startsWith('ndembo_'));
+        if (!hasNdemboKey) {
+          alert("Le fichier ne contient aucune donnée valide pour Ndembo Kin Connect.");
+          return;
+        }
+
+        if (confirm("Êtes-vous sûr de vouloir importer ces données ? Cela remplacera TOUTES vos données actuelles (contacts, contrats, finances, paramètres, etc.).")) {
+          keys.forEach(k => {
+            if (k.startsWith('ndembo_')) {
+              localStorage.setItem(k, parsed[k]);
+            }
+          });
+          alert("Données importées avec succès ! L'application va se recharger.");
+          window.location.reload();
+        }
+      } catch (err) {
+        alert("Erreur lors de l'importation : " + err);
+      }
+    };
+    reader.readAsText(file);
   };
 
   // User List helper methods
@@ -368,7 +451,7 @@ export default function ParametresView({
     }
   };
 
-  const handleSaveUserSubmit = (e: React.FormEvent) => {
+  const handleSaveUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserFormError(null);
 
@@ -395,6 +478,8 @@ export default function ParametresView({
       return;
     }
 
+    const hashedInputPassword = formPassword ? await hashPassword(formPassword) : undefined;
+
     if (editingUser) {
       // Edit User
       const updatedList = usersList.map(u => {
@@ -405,7 +490,7 @@ export default function ParametresView({
             email: emailClean,
             role: formRole,
             avatarUrl: formAvatar,
-            ...(formPassword ? { password: formPassword } : {})
+            ...(hashedInputPassword ? { password: hashedInputPassword } : {})
           };
         }
         return u;
@@ -420,19 +505,21 @@ export default function ParametresView({
           email: emailClean,
           role: formRole,
           avatarUrl: formAvatar,
-          ...(formPassword ? { password: formPassword } : {})
+          ...(hashedInputPassword ? { password: hashedInputPassword } : {})
         });
       }
 
       setUserSuccessMessage(`L'utilisateur ${formName} a été mis à jour.`);
     } else {
       // Add User
+      const defaultPass = formPassword || 'admin1234';
+      const hashedPassword = await hashPassword(defaultPass);
       const newUser: SystemUser = {
         id: 'usr_' + Date.now(),
         name: formName.trim(),
         email: emailClean,
         role: formRole,
-        password: formPassword || 'admin1234', // default password
+        password: hashedPassword,
         avatarUrl: formAvatar
       };
       setUsersList([...usersList, newUser]);
@@ -927,6 +1014,63 @@ export default function ParametresView({
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Backup & Restore JSON block */}
+          <div className="bg-white border border-[#bec8d2]/70 rounded-2xl p-6 md:p-8 space-y-6 shadow-xs">
+            <div>
+              <h4 className="font-heading font-extrabold text-sm text-on-surface uppercase tracking-tight flex items-center gap-1.5">
+                <Download className="w-5 h-5 text-primary" />
+                <span>Sauvegarde &amp; Restauration Manuelle</span>
+              </h4>
+              <p className="text-xs text-[#6f7881]">Téléchargez une copie de vos données Ndembo Kin Connect ou restaurez une sauvegarde précédente pour éviter toute perte accidentelle.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Export Box */}
+              <div className="flex flex-col justify-between p-5 rounded-xl border border-[#bec8d2]/30 bg-slate-50/50 space-y-4">
+                <div className="space-y-1 text-xs">
+                  <span className="font-mono font-bold text-primary flex items-center gap-1.5">
+                    <Download className="w-4 h-4" />
+                    EXPORTER TOUTES LES DONNÉES
+                  </span>
+                  <p className="text-[#3f4850] leading-relaxed">
+                    Générez et téléchargez un fichier de sauvegarde JSON contenant l'intégralité de vos athlètes, contrats, devis, factures, transactions financières et paramètres.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportData}
+                  className="bg-primary hover:bg-[#007cb4] text-white font-heading font-extrabold text-xs px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer w-full transition-transform hover:scale-[1.01]"
+                >
+                  <Download className="w-3.5 h-3.5 text-white" />
+                  <span>Exporter les données (.json)</span>
+                </button>
+              </div>
+
+              {/* Import Box */}
+              <div className="flex flex-col justify-between p-5 rounded-xl border border-[#bec8d2]/30 bg-slate-50/50 space-y-4">
+                <div className="space-y-1 text-xs">
+                  <span className="font-mono font-bold text-primary flex items-center gap-1.5">
+                    <Upload className="w-4 h-4" />
+                    RESTAURER DEPUIS UN FICHIER
+                  </span>
+                  <p className="text-[#3f4850] leading-relaxed">
+                    Sélectionnez un fichier de sauvegarde Ndembo Kin JSON précédemment exporté pour remplacer intégralement vos données actuelles. Attention, cette action est irréversible.
+                  </p>
+                </div>
+                <label className="bg-slate-800 hover:bg-slate-900 text-white font-heading font-extrabold text-xs px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 shadow-xs cursor-pointer w-full text-center transition-transform hover:scale-[1.01]">
+                  <Upload className="w-3.5 h-3.5 text-white" />
+                  <span>Importer un fichier (.json)</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportData}
+                    className="hidden"
+                  />
+                </label>
               </div>
             </div>
           </div>

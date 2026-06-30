@@ -35,6 +35,7 @@ interface DevisViewProps {
   onConvertToProject: (devis: Devis) => void;
   tvaDefault: number;
   settings?: BusinessSettings;
+  autoOpenCreate?: boolean;
 }
 
 export default function DevisView({
@@ -45,14 +46,21 @@ export default function DevisView({
   onConvertToFacture,
   onConvertToProject,
   tvaDefault,
-  settings
+  settings,
+  autoOpenCreate
 }: DevisViewProps) {
   // Navigation & filter states
   const [filterStatus, setFilterStatus] = useState<DevisStatus | 'Tous'>('Tous');
   const [searchTerm, setSearchTerm] = useState('');
   
   // Create state
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(!!autoOpenCreate);
+
+  React.useEffect(() => {
+    if (autoOpenCreate) {
+      setShowCreateModal(true);
+    }
+  }, [autoOpenCreate]);
   const [clientId, setClientId] = useState('');
   const [dateExpiration, setDateExpiration] = useState('');
   const [notes, setNotes] = useState('Paiement requis à 50% à la signature du mandat. Devis valable 30 jours.');

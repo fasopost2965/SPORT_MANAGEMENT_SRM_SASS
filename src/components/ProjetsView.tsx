@@ -38,6 +38,7 @@ interface ProjetsViewProps {
   onUpdateTaskStatus: (taskId: string, status: TaskStatus) => void;
   onUpdateTaskProgress: (taskId: string, progress: number) => void;
   onRemoveTask: (taskId: string) => void;
+  autoOpenCreate?: boolean;
 }
 
 export default function ProjetsView({
@@ -49,7 +50,8 @@ export default function ProjetsView({
   onAddTaskToProject,
   onUpdateTaskStatus,
   onUpdateTaskProgress,
-  onRemoveTask
+  onRemoveTask,
+  autoOpenCreate
 }: ProjetsViewProps) {
   // Navigation & selection
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projects[0]?.id || null);
@@ -57,7 +59,13 @@ export default function ProjetsView({
   const [searchTerm, setSearchTerm] = useState('');
 
   // Creation forms
-  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(!!autoOpenCreate);
+
+  React.useEffect(() => {
+    if (autoOpenCreate) {
+      setShowCreateProjectModal(true);
+    }
+  }, [autoOpenCreate]);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectClientId, setNewProjectClientId] = useState('');
   const [newProjectBudget, setNewProjectBudget] = useState(0);

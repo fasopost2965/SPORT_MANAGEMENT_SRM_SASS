@@ -29,14 +29,21 @@ interface ContratsViewProps {
   projects?: Project[];
   onAddContract: (contract: Contract) => void;
   onUpdateContractStatus: (id: string, status: ContractStatus) => void;
+  autoOpenCreate?: boolean;
 }
 
-export default function ContratsView({ contracts, contacts, projects = [], onAddContract, onUpdateContractStatus }: ContratsViewProps) {
+export default function ContratsView({ contracts, contacts, projects = [], onAddContract, onUpdateContractStatus, autoOpenCreate }: ContratsViewProps) {
   const [filterType, setFilterType] = useState<ContractType | 'Tous'>('Tous');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Creation forms states
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(!!autoOpenCreate);
+
+  React.useEffect(() => {
+    if (autoOpenCreate) {
+      setShowCreateModal(true);
+    }
+  }, [autoOpenCreate]);
   const [clientId, setClientId] = useState('');
   const [contractType, setContractType] = useState<ContractType>('Management');
   const [amount, setAmount] = useState(15000);
